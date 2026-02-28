@@ -1,84 +1,168 @@
 import json
 from pathlib import Path
-from typing import Dict, Any
-
 from cryptography.fernet import Fernet
+import uuid
 
+# =====================================================
+# PATHS
+# =====================================================
 
-# Encrypted storage files
-DATA_PATH = Path("data/folders.enc")
-CONFIG_PATH = Path("data/config.enc")
-SECRET_KEY_PATH = Path("data/secret.key")
+DATA_PATH = Path("data/folders.json")
+PROVIDERS_PATH = Path("data/providers.enc")
+SOURCES_PATH = Path("data/sources.enc")
+KEY_PATH = Path("data/secret.key")
 
+# =====================================================
+# ENCRYPTION
+# =====================================================
 
-# ---------------------------
-# Encryption Core
-# ---------------------------
+def get_cipher():
+    KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-def _get_cipher() -> Fernet:
-    """
-    Loads or creates encryption key.
-    This key MUST NOT be committed to git.
-    """
-    SECRET_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not KEY_PATH.exists():
+        KEY_PATH.write_bytes(Fernet.generate_key())
 
-    if not SECRET_KEY_PATH.exists():
-        key = Fernet.generate_key()
-        SECRET_KEY_PATH.write_bytes(key)
-    else:
-        key = SECRET_KEY_PATH.read_bytes()
-
+    key = KEY_PATH.read_bytes()
     return Fernet(key)
 
+# =====================================================
+# PLAYLIST CACHE (NOT ENCRYPTED)
+# =====================================================
 
-# ---------------------------
-# Folder Data (Encrypted)
-# ---------------------------
-
-def load_data() -> Dict[str, Any]:
+def load_data():
     if not DATA_PATH.exists():
         return {"last_folder": None, "folders": []}
-
-    try:
-        cipher = _get_cipher()
-        encrypted = DATA_PATH.read_bytes()
-        decrypted = cipher.decrypt(encrypted)
-        return json.loads(decrypted.decode())
-    except Exception:
-        return {"last_folder": None, "folders": []}
+    return json.loads(DATA_PATH.read_text())
 
 
-def save_data(data: Dict[str, Any]):
-    cipher = _get_cipher()
-    raw = json.dumps(data).encode()
-    encrypted = cipher.encrypt(raw)
-
+def save_data(data):
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DATA_PATH.write_bytes(encrypted)
+    DATA_PATH.write_text(json.dumps(data, indent=2))
+
+# =====================================================
+# PROVIDERS (Encrypted API Keys)
+# =====================================================
+
+def load_providers():
+    cipher = get_cipher()
+
+    if not PROVIDERS_PATH.exists():
+        return {"active_provider_id": None, "providers": []}
+
+    decrypted = cipher.decrypt(PROVIDERS_PATH.read_bytes())
+    return json.loads(decrypted.decode())
 
 
-# ---------------------------
-# Config (Encrypted API Key)
-# ---------------------------
+def save_providers(data):
+    cipher = get_cipher()
+    encrypted = cipher.encrypt(json.dumps(data).encode())
 
-def load_config() -> Dict[str, Any]:
-    if not CONFIG_PATH.exists():
-        return {"google_api_key": None}
-
-    try:
-        cipher = _get_cipher()
-        encrypted = CONFIG_PATH.read_bytes()
-        decrypted = cipher.decrypt(encrypted)
-        config = json.loads(decrypted.decode())
-        return config
-    except Exception:
-        return {"google_api_key": None}
+    PROVIDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROVIDERS_PATH.write_bytes(encrypted)
 
 
-def save_config(config: Dict[str, Any]):
-    cipher = _get_cipher()
-    raw = json.dumps(config).encode()
-    encrypted = cipher.encrypt(raw)
+def add_provider(name, api_key):
+    data = load_providers()
 
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_bytes(encrypted)
+    provider = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "type": "google_drive",
+        "api_key": api_key
+    }
+
+    data["providers"].append(provider)
+
+    if not data["active_provider_id"]:
+        data["active_provider_id"] = provider["id"]
+
+    save_providers(data)
+    return provider
+
+
+def get_providers_metadata():
+    data = load_providers()
+
+    return [
+        {
+            "id": p["id"],
+            "name": p["name"],
+            "type": p["type"],
+            "active": p["id"] == data["active_provider_id"]
+        }
+        for p in data["providers"]
+    ]
+
+
+def set_active_provider(provider_id):
+    data = load_providers()
+    data["active_provider_id"] = provider_id
+    save_providers(data)
+
+
+def get_active_provider():
+    data = load_providers()
+    active_id = data.get("active_provider_id")
+
+    for p in data["providers"]:
+        if p["id"] == active_id:
+            return p
+
+    return None
+
+# =====================================================
+# SOURCES (Encrypted URLs)
+# =====================================================
+
+def load_sources():
+    cipher = get_cipher()
+
+    if not SOURCES_PATH.exists():
+        return {"active_source_id": None, "sources": []}
+
+    decrypted = cipher.decrypt(SOURCES_PATH.read_bytes())
+    return json.loads(decrypted.decode())
+
+
+def save_sources(data):
+    cipher = get_cipher()
+    encrypted = cipher.encrypt(json.dumps(data).encode())
+
+    SOURCES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SOURCES_PATH.write_bytes(encrypted)
+
+
+def add_source(name, url, provider_id):
+    data = load_sources()
+
+    source = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "url": url,
+        "provider_id": provider_id
+    }
+
+    data["sources"].append(source)
+
+    if not data["active_source_id"]:
+        data["active_source_id"] = source["id"]
+
+    save_sources(data)
+    return source
+
+
+def activate_source(source_id):
+    data = load_sources()
+    data["active_source_id"] = source_id
+    save_sources(data)
+
+
+def get_active_source():
+    data = load_sources()
+    active_id = data.get("active_source_id")
+
+    for s in data["sources"]:
+        if s["id"] == active_id:
+            return s
+
+    return None

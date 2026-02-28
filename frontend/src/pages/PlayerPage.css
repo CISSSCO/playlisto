@@ -1,0 +1,162 @@
+/* Background handled globally */
+
+/* OUTER WRAPPER */
+
+.player-card {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+/* GLASS CONTAINER */
+
+.glass-container {
+  width: 100%;
+  max-width: 650px;
+}
+
+/* MAIN GLASS CARD */
+
+.glass-card {
+  padding: 45px;
+  border-radius: 30px;
+
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(35px);
+  -webkit-backdrop-filter: blur(35px);
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+/* INPUT ROW */
+
+.input-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.input-row input {
+  flex: 1;
+  padding: 16px;
+  border-radius: 20px;
+  border: none;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.input-row button {
+  padding: 16px 22px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+
+  background: linear-gradient(135deg, #00d4ff, #92fe9d);
+  transition: 0.3s;
+}
+
+.input-row button:hover {
+  transform: translateY(-2px);
+}
+
+/* TRACK TITLE */
+
+.track-title {
+  margin-bottom: 25px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+/* CONTROLS */
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 25px;
+}
+
+.controls button {
+  width: 55px;
+  height: 55px;
+  border-radius: 18px;
+  border: none;
+  cursor: pointer;
+
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(15px);
+
+  transition: 0.3s;
+}
+
+.controls button:hover {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.controls button.active {
+  background: linear-gradient(135deg, #00d4ff, #ff6ec7);
+  color: white;
+}
+
+/* PROGRESS BAR */
+
+.progress-bar-wrapper {
+  width: 100%;
+  height: 8px;
+  border-radius: 20px;
+  margin-bottom: 30px;
+
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00d4ff, #ff6ec7);
+  transition: width 0.2s linear;
+}
+
+/* PLAYLIST */
+
+.playlist {
+  list-style: none;
+}
+
+.playlist li {
+  padding: 14px 18px;
+  border-radius: 15px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.playlist li:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.playlist li.active {
+  background: linear-gradient(135deg, #00d4ff, #92fe9d);
+  color: black;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 30px;
+  }
+
+  .controls button {
+    width: 48px;
+    height: 48px;
+  }
+}

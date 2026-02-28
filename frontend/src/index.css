@@ -1,0 +1,78 @@
+/* RESET */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+}
+
+body {
+  overflow-x: hidden;
+  min-height: 100vh;
+  color: white;
+
+  /* Layered vibrant background */
+  background:
+    radial-gradient(circle at 20% 20%, #7b61ff, transparent 40%),
+    radial-gradient(circle at 80% 80%, #00d4ff, transparent 40%),
+    linear-gradient(135deg, #5f6fff, #00c6ff);
+}
+
+/* ROOT WRAPPER */
+
+.app-root {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* FLOATING BLOBS */
+
+.app-root::before,
+.app-root::after {
+  content: "";
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.7;
+  z-index: 0;
+}
+
+.app-root::before {
+  background: #00e0ff;
+  top: -150px;
+  left: -150px;
+}
+
+.app-root::after {
+  background: #ff6ec7;
+  bottom: -150px;
+  right: -150px;
+}
+
+/* HEADER */
+
+.global-header {
+  position: relative;
+  z-index: 5;
+  padding: 30px 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.brand-title {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.hamburger {
+  position: absolute;
+  right: 50px;
+  font-size: 22px;
+  cursor: pointer;
+}

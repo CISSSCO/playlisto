@@ -1,0 +1,103 @@
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(5px);
+  z-index: 10;
+}
+
+/* SIDEBAR PANEL */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 360px;
+  max-width: 90%;
+  height: 100%;
+  padding: 35px;
+
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+
+  box-shadow: -15px 0 60px rgba(0, 0, 0, 0.3);
+
+  z-index: 20;
+}
+
+/* HEADER */
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.sidebar-header span {
+  cursor: pointer;
+}
+
+/* FORM */
+
+.provider-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.provider-form input {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+}
+
+.provider-form button {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+
+  background: linear-gradient(135deg, #00d4ff, #92fe9d);
+}
+
+/* PROVIDER LIST */
+
+.provider-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.active-badge {
+  color: #00ff99;
+  font-weight: 600;
+}
+
+.provider-item button {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* CLOSE BUTTON */
+
+.close-app-btn {
+  margin-top: 30px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 15px;
+  border: none;
+  cursor: pointer;
+
+  background: linear-gradient(135deg, #ff4d4d, #ff1a1a);
+  color: white;
+}

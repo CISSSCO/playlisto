@@ -1,96 +1,127 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from .drive import fetch_folder_files
 from .streaming import stream_file
-from .storage import load_data, save_data, load_config, save_config
+from .storage import (
+    load_data,
+    save_data,
+    add_source,
+    load_sources,
+    activate_source,
+    add_provider,
+    get_providers_metadata,
+    set_active_provider,
+)
 
-app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")
+app = FastAPI(title="Playlisto")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# -----------------------------
-# API KEY MANAGEMENT
-# -----------------------------
+# =========================
+# LOAD PLAYLIST
+# =========================
 
-@app.post("/set-api-key")
-async def set_api_key(payload: dict):
-    api_key = payload.get("api_key")
-
-    if not api_key:
-        raise HTTPException(status_code=400, detail="API key required")
-
-    save_config({"google_api_key": api_key})
-    return {"status": "saved"}
-
-
-@app.get("/api-key-status")
-async def api_key_status():
-    config = load_config()
-    return {"configured": bool(config.get("google_api_key"))}
-
-
-# -----------------------------
-# MAIN PAGE
-# -----------------------------
-
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    data = load_data()
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "data": data,
-        },
-    )
-
-
-# -----------------------------
-# LOAD FOLDER (Encrypted Storage)
-# -----------------------------
-
-@app.post("/load-folder")
-async def load_folder(payload: dict):
-    folder_url = payload.get("url")
-
-    if not folder_url:
-        raise HTTPException(status_code=400, detail="Folder URL required")
-
-    files = await fetch_folder_files(folder_url)
+@app.post("/api/load-folder")
+async def load_folder():
+    files = await fetch_folder_files()
 
     data = load_data()
 
     folder_entry = {
-        # IMPORTANT:
-        # We still store URL internally (encrypted by storage layer)
-        # but we do NOT rely on returning it to frontend.
-        "url": folder_url,
-        "name": folder_url.split("/")[-1],
+        "name": "Active Source",
         "files": [f.dict() for f in files],
     }
 
-    data["last_folder"] = folder_url
-
-    existing = [f for f in data["folders"] if f["url"] == folder_url]
-    if not existing:
-        data["folders"].append(folder_entry)
+    data["last_folder"] = "active_source"
+    data["folders"] = [folder_entry]
 
     save_data(data)
 
-    # DO NOT return full data structure.
-    # Only return what's needed for frontend.
     return {
         "name": folder_entry["name"],
         "files": folder_entry["files"],
     }
 
-
-# -----------------------------
-# STREAMING (UNCHANGED)
-# -----------------------------
-
-@app.get("/stream/{file_id}")
+@app.get("/api/stream/{file_id}")
 async def stream(file_id: str, filename: str, request: Request):
     return await stream_file(file_id, filename, request)
+
+# =========================
+# SOURCES
+# =========================
+
+@app.get("/api/sources")
+async def list_sources():
+    return load_sources()
+
+@app.post("/api/sources")
+async def create_source(payload: dict):
+    name = payload.get("name")
+    url = payload.get("url")
+    provider_id = payload.get("provider_id")
+
+    if not name or not url or not provider_id:
+        raise HTTPException(status_code=400, detail="Invalid input")
+
+    add_source(name, url, provider_id)
+    return {"status": "created"}
+
+@app.post("/api/sources/activate/{source_id}")
+async def activate_source_endpoint(source_id: str):
+    activate_source(source_id)
+    return {"status": "activated"}
+
+# =========================
+# PROVIDERS
+# =========================
+
+@app.get("/api/providers")
+async def list_providers():
+    return get_providers_metadata()
+
+@app.post("/api/providers")
+async def create_provider(payload: dict):
+    name = payload.get("name")
+    api_key = payload.get("api_key")
+
+    if not name or not api_key:
+        raise HTTPException(status_code=400, detail="Name and API key required")
+
+    provider = add_provider(name, api_key)
+
+    return {
+        "id": provider["id"],
+        "name": provider["name"],
+        "type": provider["type"]
+    }
+
+@app.post("/api/providers/activate/{provider_id}")
+async def activate_provider(provider_id: str):
+    set_active_provider(provider_id)
+    return {"status": "activated"}
+
+# =========================
+# SERVE REACT BUILD
+# =========================
+
+FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        index_file = FRONTEND_DIST / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"error": "Frontend not built. Run npm run build."}
