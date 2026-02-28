@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Drive Music</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 20%, #1f2a44, #0f172a 60%);
+      overflow: hidden;
+      color: white;
+    }
+
+    /* Ambient background glow */
+    body::before {
+      content: "";
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, #1db95440, transparent 70%);
+      top: -150px;
+      right: -150px;
+      filter: blur(120px);
+      z-index: 0;
+    }
+
+    .glass-card {
+      position: relative;
+      z-index: 1;
+      width: 480px;
+      padding: 30px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow:
+        0 30px 60px rgba(0, 0, 0, 0.6),
+        inset 0 0 30px rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0 0 25px 0;
+      font-weight: 600;
+      letter-spacing: 1px;
+      font-size: 22px;
+      opacity: 0.9;
+    }
+
+    .folder-row {
+      width: 100%;
+      display: flex;
+      margin-bottom: 20px;
+    }
+
+    .folder-row input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 14px;
+      border: none;
+      outline: none;
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      backdrop-filter: blur(10px);
+    }
+
+    .folder-row button {
+      margin-left: 10px;
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #1db954, #1ed760);
+      color: black;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .folder-row button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(30, 215, 96, 0.4);
+    }
+
+    .now-playing {
+      margin: 20px 0 10px;
+      font-size: 16px;
+      font-weight: 500;
+      text-align: center;
+      min-height: 22px;
+      opacity: 0.85;
+    }
+
+    .controls {
+      margin: 10px 0 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .controls button {
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: white;
+      font-size: 18px;
+      margin: 0 8px;
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .controls button:hover {
+      background: #1db954;
+      color: black;
+      transform: scale(1.1);
+    }
+
+    .toggle-active {
+      background: #1db954 !important;
+      color: black !important;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 10px;
+      filter: invert(1) brightness(1.2);
+    }
+
+    .playlist {
+      width: 100%;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 0;
+      list-style: none;
+    }
+
+    .playlist li {
+      padding: 10px 14px;
+      border-radius: 14px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: 0.2s ease;
+      font-size: 14px;
+    }
+
+    .playlist li:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .playlist li.active {
+      background: linear-gradient(135deg, #1db954, #1ed760);
+      color: black;
+      font-weight: 600;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+<div class="glass-card">
+
+  <h1>Drive Music</h1>
+
+  <div class="folder-row">
+    <input id="apiKeyInput" placeholder="Paste Google API Key">
+    <button onclick="saveApiKey()">Save Key</button>
+  </div>
+
+  <div class="folder-row">
+    <input id="folderUrl" placeholder="Paste Drive folder URL">
+    <button onclick="loadFolder()">Load</button>
+  </div>
+
+  <div class="now-playing" id="nowPlaying"></div>
+
+  <div class="controls">
+    <button onclick="prevTrack()">⏮</button>
+    <button onclick="togglePlay()">⏯</button>
+    <button onclick="nextTrack()">⏭</button>
+    <button id="shuffleBtn" onclick="toggleShuffle()">🔀</button>
+    <button id="loopBtn" onclick="toggleLoop()">🔁</button>
+  </div>
+
+  <audio id="player" controls></audio>
+
+  <ul id="playlist" class="playlist"></ul>
+
+</div>
+
+<script>
+let playlist = [];
+let currentIndex = 0;
+let shuffleEnabled = false;
+let loopEnabled = false;
+
+const player = document.getElementById("player");
+const nowPlaying = document.getElementById("nowPlaying");
+
+async function saveApiKey() {
+  const key = document.getElementById("apiKeyInput").value;
+
+  await fetch("/set-api-key", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({api_key: key})
+  });
+
+  alert("API Key saved!");
+}
+
+async function loadFolder() {
+  const url = document.getElementById("folderUrl").value;
+
+  const response = await fetch("/load-folder", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({url})
+  });
+
+  const data = await response.json();
+  playlist = data.files;
+  currentIndex = 0;
+  renderPlaylist();
+  playCurrent();
+}
+
+function renderPlaylist() {
+  const list = document.getElementById("playlist");
+  list.innerHTML = "";
+
+  playlist.forEach((file, index) => {
+    const li = document.createElement("li");
+    li.textContent = file.name;
+    if (index === currentIndex) li.classList.add("active");
+
+    li.onclick = () => {
+      currentIndex = index;
+      playCurrent();
+    };
+
+    list.appendChild(li);
+  });
+}
+
+function playCurrent() {
+  if (playlist.length === 0) return;
+
+  const file = playlist[currentIndex];
+  player.src = `/stream/${file.id}?filename=${encodeURIComponent(file.name)}`;
+  player.play();
+
+  nowPlaying.textContent = file.name;
+  renderPlaylist();
+}
+
+function togglePlay() {
+  if (player.paused) player.play();
+  else player.pause();
+}
+
+function nextTrack() {
+  if (shuffleEnabled) {
+    currentIndex = Math.floor(Math.random() * playlist.length);
+  } else {
+    currentIndex++;
+    if (currentIndex >= playlist.length) {
+      if (loopEnabled) currentIndex = 0;
+      else return;
+    }
+  }
+  playCurrent();
+}
+
+function prevTrack() {
+  currentIndex--;
+  if (currentIndex < 0) {
+    if (loopEnabled) currentIndex = playlist.length - 1;
+    else currentIndex = 0;
+  }
+  playCurrent();
+}
+
+function toggleShuffle() {
+  shuffleEnabled = !shuffleEnabled;
+  document.getElementById("shuffleBtn").classList.toggle("toggle-active", shuffleEnabled);
+}
+
+function toggleLoop() {
+  loopEnabled = !loopEnabled;
+  document.getElementById("loopBtn").classList.toggle("toggle-active", loopEnabled);
+}
+
+player.addEventListener("ended", () => {
+  nextTrack();
+});
+
+async function initSettings() {
+  const res = await fetch("/api-key-status");
+  const data = await res.json();
+
+  const apiSection = document.getElementById("apiSection");
+
+  if (data.configured) {
+    apiSection.innerHTML = `
+      <div class="folder-row">
+        <span style="flex:1;opacity:0.8;">API Key Configured</span>
+        <button onclick="showApiInput()">Change API Key</button>
+      </div>
+      <div id="apiInputRow" class="folder-row" style="display:none;">
+        <input id="apiKeyInput" placeholder="Enter New API Key">
+        <button onclick="saveApiKey()">Save</button>
+      </div>
+    `;
+  } else {
+    apiSection.innerHTML = `
+      <div class="folder-row">
+        <input id="apiKeyInput" placeholder="Paste Google API Key">
+        <button onclick="saveApiKey()">Save</button>
+      </div>
+    `;
+  }
+
+  renderFolderInput();
+}
+
+function renderFolderInput() {
+  const folderSection = document.getElementById("folderSection");
+
+  folderSection.innerHTML = `
+    <div class="folder-row">
+      <input id="folderUrl" placeholder="Paste Drive folder URL">
+      <button onclick="loadFolder()">Load</button>
+    </div>
+  `;
+}
+
+async function saveApiKey() {
+  const keyInput = document.getElementById("apiKeyInput");
+  if (!keyInput) return;
+
+  const key = keyInput.value.trim();
+  if (!key) return;
+
+  await fetch("/set-api-key", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ api_key: key })
+  });
+
+  keyInput.value = "";
+
+  await initSettings();
+}
+
+function showApiInput() {
+  const row = document.getElementById("apiInputRow");
+  if (row) row.style.display = "flex";
+}
+
+async function loadFolder() {
+  const input = document.getElementById("folderUrl");
+  const url = input.value.trim();
+  if (!url) return;
+
+  const response = await fetch("/load-folder", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ url })
+  });
+
+  const data = await response.json();
+
+  playlist = data.files;
+  currentIndex = 0;
+
+  input.value = ""; // 🔥 Clear folder URL after load
+
+  renderPlaylist();
+  playCurrent();
+}
+
+window.addEventListener("DOMContentLoaded", initSettings);
+
+</script>
+
+</body>
+</html>
