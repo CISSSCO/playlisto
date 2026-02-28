@@ -14,6 +14,25 @@ export default function App() {
   const [shuffle, setShuffle] = useState(false);
   const [loop, setLoop] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+    //testing effect
+useEffect(() => {
+
+  const audio = audioRef.current;
+  if (!audio) return;
+
+  const handlePlay = () => setIsPlaying(true);
+  const handlePause = () => setIsPlaying(false);
+
+  audio.addEventListener("play", handlePlay);
+  audio.addEventListener("pause", handlePause);
+
+  return () => {
+    audio.removeEventListener("play", handlePlay);
+    audio.removeEventListener("pause", handlePause);
+  };
+}, []);
+
     useEffect(() => {
       const audio = audioRef.current;
       if (!audio) return;
@@ -31,6 +50,8 @@ export default function App() {
       };
     }, []);
 
+
+
   // ONLY change src when track changes
   useEffect(() => {
     if (!audioRef.current) return;
@@ -46,33 +67,72 @@ export default function App() {
     }
   }, [currentIndex, playlist]);
 
-  const nextTrack = () => {
-    if (shuffle) {
-      const random = Math.floor(Math.random() * playlist.length);
-      setCurrentIndex(random);
-    } else if (currentIndex + 1 < playlist.length) {
-      setCurrentIndex(currentIndex + 1);
-    } else if (loop) {
-      setCurrentIndex(0);
-    }
-  };
+const nextTrack = () => {
+  if (!audioRef.current) return;
+  if (playlist.length === 0) return;
 
-  const prevTrack = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
+  // 🔁 LOOP MODE — repeat current track
+  if (loop) {
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch(() => {});
+    return;
+  }
 
-  const closeApp = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
+  // 🔀 SHUFFLE MODE
+  if (shuffle) {
+    let random = currentIndex;
+    while (random === currentIndex) {
+      random = Math.floor(Math.random() * playlist.length);
     }
-    setPlaylist([]);
+    setCurrentIndex(random);
+    return;
+  }
+
+  // ▶ NORMAL NEXT
+  if (currentIndex + 1 < playlist.length) {
+    setCurrentIndex(currentIndex + 1);
+  } else {
     setIsPlaying(false);
-    setShowSettings(false);
-  };
+  }
+};
 
+const prevTrack = () => {
+  if (!audioRef.current) return;
+  if (playlist.length === 0) return;
+
+  // 🔁 LOOP MODE — repeat current track
+  if (loop) {
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch(() => {});
+    return;
+  }
+
+  // 🔀 SHUFFLE MODE (same logic as next)
+  if (shuffle) {
+    let random = currentIndex;
+    while (random === currentIndex) {
+      random = Math.floor(Math.random() * playlist.length);
+    }
+    setCurrentIndex(random);
+    return;
+  }
+
+  // ◀ NORMAL PREVIOUS
+  if (currentIndex > 0) {
+    setCurrentIndex(currentIndex - 1);
+  }
+};
+const closeApp = () => {
+  if (audioRef.current) {
+    audioRef.current.pause();
+    audioRef.current.src = "";
+  }
+
+  setPlaylist([]);
+  setIsPlaying(false);
+  setCurrentIndex(0);
+  setShowSettings(false);
+};
   return (
     <div className="app-root">
         <audio

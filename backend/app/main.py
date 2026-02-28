@@ -81,6 +81,19 @@ async def activate_source_endpoint(source_id: str):
     activate_source(source_id)
     return {"status": "activated"}
 
+@app.delete("/api/sources/{source_id}")
+async def delete_source(source_id: str):
+    from .storage import load_sources, save_sources
+
+    data = load_sources()
+    data["sources"] = [s for s in data["sources"] if s["id"] != source_id]
+
+    if data.get("active_source_id") == source_id:
+        data["active_source_id"] = None
+
+    save_sources(data)
+    return {"status": "deleted"}
+
 # =========================
 # PROVIDERS
 # =========================

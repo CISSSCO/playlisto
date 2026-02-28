@@ -69,15 +69,50 @@
 
 /* PROVIDER LIST */
 
+/* SOURCE / PROVIDER ITEM */
 .provider-item {
   display: flex;
+  align-items: center;        /* vertical center */
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  margin-bottom: 10px;
+
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(15px);
+  transition: 0.3s ease;
+}
+
+/* ACTIVE SOURCE STYLE */
+.active-source {
+  background: linear-gradient(135deg, #00d4ff, #92fe9d);
+  color: black;
+}
+
+/* ACTIONS (Active + X button container) */
+.source-actions {
+  display: flex;
+  align-items: center;   /* vertical center */
+  gap: 10px;
+}
+
+/* REMOVE BUTTON */
+.remove-btn {
+  background: #ff3b3b;
+  border: none;
+  border-radius: 12px;
+  padding: 6px 10px;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.remove-btn:hover {
+  transform: scale(1.05);
 }
 
 .active-badge {
-  color: #00ff99;
+  color: #5854db;
   font-weight: 600;
 }
 
@@ -100,4 +135,53 @@
 
   background: linear-gradient(135deg, #ff4d4d, #ff1a1a);
   color: white;
+}
+.source-list-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding-right: 5px;
+}
+
+.active-source {
+  background: linear-gradient(135deg, #00d4ff, #92fe9d);
+  color: black;
+  border-radius: 12px;
+}
+
+.source-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.remove-btn {
+  background: rgba(255, 0, 0, 0.8);
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.remove-btn:hover {
+  background: red;
+}
+/* Make entire sidebar scrollable */
+.sidebar {
+  overflow-y: auto;
+}
+
+/* Smooth scroll */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.3);
+  border-radius: 10px;
+}
+.sidebar {
+  height: 100vh;
+  overflow-y: auto;
 }

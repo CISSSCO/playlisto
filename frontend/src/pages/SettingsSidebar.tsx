@@ -13,7 +13,6 @@ interface Provider {
 interface Source {
   id: string;
   name: string;
-  url: string;
   provider_id: string;
 }
 
@@ -28,6 +27,7 @@ export default function SettingsSidebar({
 }: Props) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [sources, setSources] = useState<any[]>([]);
+  const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
 
   const [providerName, setProviderName] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -46,6 +46,7 @@ export default function SettingsSidebar({
     const res = await fetch(`${API_BASE}/sources`);
     const data = await res.json();
     setSources(data.sources || []);
+    setActiveSourceId(data.active_source_id || null);
   };
 
   useEffect(() => {
@@ -95,6 +96,13 @@ export default function SettingsSidebar({
   const activateSource = async (id: string) => {
     await fetch(`${API_BASE}/sources/activate/${id}`, {
       method: "POST"
+    });
+    fetchSources();
+  };
+
+  const removeSource = async (id: string) => {
+    await fetch(`${API_BASE}/sources/${id}`, {
+      method: "DELETE"
     });
     fetchSources();
   };
@@ -165,13 +173,33 @@ export default function SettingsSidebar({
           <button onClick={addSource}>Add Source</button>
         </div>
 
-        <div className="provider-list">
+        {/* SCROLLABLE SOURCE LIST */}
+        <div className="source-list-scroll">
           {sources.map((s: any) => (
-            <div key={s.id} className="provider-item">
+            <div
+              key={s.id}
+              className={`provider-item ${
+                activeSourceId === s.id ? "active-source" : ""
+              }`}
+            >
               <strong>{s.name}</strong>
-              <button onClick={() => activateSource(s.id)}>
-                Activate
-              </button>
+
+              <div className="source-actions">
+                {activeSourceId === s.id ? (
+                  <span className="active-badge">Active</span>
+                ) : (
+                  <button onClick={() => activateSource(s.id)}>
+                    Activate
+                  </button>
+                )}
+
+                <button
+                  className="remove-btn"
+                  onClick={() => removeSource(s.id)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
         </div>
