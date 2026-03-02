@@ -1,59 +1,68 @@
 import httpx
-import mimetypes
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-
-def guess_mime_type(filename: str) -> str:
-    mime, _ = mimetypes.guess_type(filename)
-    return mime or "application/octet-stream"
+CHUNK_SIZE = 1024 * 1024
 
 
 async def stream_file(file_id: str, filename: str, request: Request):
-    drive_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    media_type = guess_mime_type(filename)
+    base_url = "https://drive.google.com/uc"
+    params = {
+        "export": "download",
+        "id": file_id,
+    }
 
     headers = {}
-    if "range" in request.headers:
-        headers["Range"] = request.headers["range"]
+    range_header = request.headers.get("range")
 
-    async def iterator():
-        async with httpx.AsyncClient(
-            timeout=None,
-            follow_redirects=True
-        ) as client:
-            async with client.stream("GET", drive_url, headers=headers) as response:
+    if range_header:
+        headers["Range"] = range_header
 
-                if response.status_code not in (200, 206):
-                    raise HTTPException(
-                        status_code=response.status_code,
-                        detail="Drive download failed"
-                    )
+    async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:
 
-                async for chunk in response.aiter_bytes():
-                    yield chunk
+        response = await client.get(
+            base_url,
+            params=params,
+            headers=headers,
+        )
 
-    # We must pre-fetch headers once to send proper metadata
-    async with httpx.AsyncClient(
-        timeout=None,
-        follow_redirects=True
-    ) as client:
-        async with client.stream("GET", drive_url, headers=headers) as response:
+        # Large file confirmation handling
+        if "text/html" in response.headers.get("content-type", ""):
+            import re
+            match = re.search(r"confirm=([0-9A-Za-z_]+)", response.text)
+            if match:
+                confirm_token = match.group(1)
+                params["confirm"] = confirm_token
 
-            if response.status_code not in (200, 206):
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail="Drive download failed"
+                response = await client.get(
+                    base_url,
+                    params=params,
+                    headers=headers,
                 )
 
-            response_headers = {}
-            for h in ["Content-Length", "Content-Range", "Accept-Ranges"]:
-                if h in response.headers:
-                    response_headers[h] = response.headers[h]
+        async def file_iterator():
+            async for chunk in response.aiter_bytes(CHUNK_SIZE):
+                yield chunk
 
-            return StreamingResponse(
-                iterator(),
-                status_code=response.status_code,
-                headers=response_headers,
-                media_type=media_type,
-            )
+        # IMPORTANT FIX:
+        status_code = response.status_code
+
+        # If browser requested range but Google returned 200,
+        # convert it to 206 manually
+        if range_header and status_code == 200:
+            status_code = 206
+
+        return StreamingResponse(
+            file_iterator(),
+            status_code=status_code,
+            headers={
+
+                 "Content-Type": response.headers.get(
+                     "content-type",
+                     "audio/flac"
+                 ),
+                "Accept-Ranges": "bytes",
+                "Content-Length": response.headers.get("content-length", ""),
+                "Content-Range": response.headers.get("content-range", ""),
+            },
+        )
