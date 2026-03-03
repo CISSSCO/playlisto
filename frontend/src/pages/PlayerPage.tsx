@@ -90,67 +90,90 @@ export default function PlayerPage({
     }
   }, [currentIndex]);
 
-  return (
-    <div className="player-card">
-      <div className="glass-container">
-        <div className="glass-card">
+    return (
+      <div className="player-card">
+        <div className="glass-container">
 
-          <div className="input-row">
-            <button onClick={loadFolder}>Load Active Source</button>
+          {/* ================= NOW PLAYING CARD ================= */}
+          <div className="glass-card now-playing-card">
+
+            <div className="input-row">
+              <button onClick={loadFolder}>Load Active Source</button>
+            </div>
+
+            {playlist.length > 0 && (
+              <>
+                <h3 className="track-title">
+                  {playlist[currentIndex]?.name}
+                </h3>
+
+                <div className="controls">
+                  <button onClick={prevTrack}>⏮</button>
+                  <button onClick={togglePlay}>
+                    {isPlaying ? "⏸" : "▶"}
+                  </button>
+                  <button onClick={nextTrack}>⏭</button>
+
+                  <button
+                    className={shuffle ? "active" : ""}
+                    onClick={() => setShuffle(!shuffle)}
+                  >
+                    🔀
+                  </button>
+
+                  <button
+                    className={loop ? "active" : ""}
+                    onClick={() => setLoop(!loop)}
+                  >
+                    🔁
+                  </button>
+                </div>
+
+                <div
+                  className="progress-bar-wrapper"
+                  ref={progressRef}
+                  onClick={handleSeek}
+                >
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
+          {/* ================= PLAYLIST CARDS ================= */}
           {playlist.length > 0 && (
-            <>
-              <h3 className="track-title">
-                {playlist[currentIndex]?.name}
-              </h3>
-
-              <div className="controls">
-                <button onClick={prevTrack}>⏮</button>
-                <button onClick={togglePlay}>
-                  {isPlaying ? "⏸" : "▶"}
-                </button>
-                <button onClick={nextTrack}>⏭</button>
-                <button
-                  className={shuffle ? "active" : ""}
-                  onClick={() => setShuffle(!shuffle)}
-                >
-                  🔀
-                </button>
-                <button
-                  className={loop ? "active" : ""}
-                  onClick={() => setLoop(!loop)}
-                >
-                  🔁
-                </button>
-              </div>
-
-              <div
-                className="progress-bar-wrapper"
-                ref={progressRef}
-                onClick={handleSeek}
-              >
+            <div className="song-list-wrapper">
+              {playlist.map((file: any, index: number) => (
                 <div
-                  className="progress-bar-fill"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              <ul className="playlist">
-                {playlist.map((file: any, index: number) => (
-                  <li
-                    key={file.id}
-                    className={index === currentIndex ? "active" : ""}
-                    onClick={() => setCurrentIndex(index)}
-                  >
+                  key={file.id}
+                    className={`song-card ${
+                      index === currentIndex ? "active-song-card" : ""
+                    }`}
+                    style={
+                      index === currentIndex
+                        ? { "--progress-width": `${progress}%` } as React.CSSProperties
+                        : {}
+                    }
+                  onClick={() => setCurrentIndex(index)}
+                >
+                  <div className="song-name">
                     {file.name}
-                  </li>
-                ))}
-              </ul>
-            </>
+                  </div>
+
+                  {index === currentIndex && (
+                    <div className="playing-indicator">
+                      {isPlaying ? "● Playing" : "● Paused"}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
+
         </div>
       </div>
-    </div>
-  );
+    );
 }
