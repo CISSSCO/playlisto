@@ -20,21 +20,36 @@ export default function PlayerPage({
 }: any) {
   const [progress, setProgress] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
+    const [activeSourceName, setActiveSourceName] = useState<string | null>(null);
+    const loadFolder = async () => {
+      const res = await fetch(`${API_BASE}/load-folder`, {
+        method: "POST"
+      });
 
-  const loadFolder = async () => {
-    const res = await fetch(`${API_BASE}/load-folder`, {
-      method: "POST"
-    });
+      if (!res.ok) {
+        alert("No active source configured.");
+        return;
+      }
 
-    if (!res.ok) {
-      alert("No active source configured.");
-      return;
-    }
+      const data = await res.json();
+      setPlaylist(data.files || []);
+      setCurrentIndex(0);
 
-    const data = await res.json();
-    setPlaylist(data.files || []);
-    setCurrentIndex(0);
-  };
+      // Save active source name
+      setActiveSourceName(data.name || "Active Source");
+    };
+
+    //remove active source
+    const removeActiveSource = () => {
+      setPlaylist([]);
+      setCurrentIndex(0);
+      setActiveSourceName(null);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      }
+    };
 
   const togglePlay = async () => {
     if (!audioRef.current) return;
@@ -97,9 +112,44 @@ export default function PlayerPage({
           {/* ================= NOW PLAYING CARD ================= */}
           <div className="glass-card now-playing-card">
 
-            <div className="input-row">
-              <button onClick={loadFolder}>Load Active Source</button>
-            </div>
+<div className="input-row source-bar">
+
+  {!activeSourceName ? (
+    <button onClick={loadFolder}>
+      Load Active Source
+    </button>
+  ) : (
+    <div className="active-source-display">
+
+      <div className="source-left">
+        <span className="drive-icon">📁</span>
+        <span className="source-name">
+          {activeSourceName}
+        </span>
+      </div>
+
+      <div className="source-actions">
+        <button
+          className="icon-btn"
+          onClick={loadFolder}
+          title="Reload"
+        >
+          🔄
+        </button>
+
+        <button
+          className="icon-btn remove"
+          onClick={removeActiveSource}
+          title="Remove"
+        >
+          ✕
+        </button>
+      </div>
+
+    </div>
+  )}
+
+</div>
 
             {playlist.length > 0 && (
               <>
