@@ -1,2 +1,388 @@
-#+title: playlisto
+#+TITLE: Playlisto
+#+AUTHOR: Playlisto Project
+#+OPTIONS: toc:3 num:t
+#+STARTUP: overview
+
+* Playlisto
+
+Playlisto is a self-hosted music streaming system designed to play music stored in Google Drive.
+
+The system consists of three components:
+
+- Backend streaming server
+- Web frontend player
+- Kodi addon client
+
+Playlisto acts as a proxy between Google Drive and client applications, allowing browsers and media players to stream audio without directly interacting with Google Drive download endpoints.
+
+The project is intended for personal music libraries stored in Google Drive.
+
+* Features
+
+- Stream audio directly from Google Drive
+- Web player interface
+- Kodi addon support
+- FLAC streaming with seek support
+- Google Drive API integration
+- Encrypted configuration storage
+- Linux setup scripts
+- Self-hosted architecture
+
+Supported formats include:
+
+- FLAC
+- MP3
+- WAV
+- M4A
+- OGG
+
+* High Level Architecture
+
+The system architecture is composed of a backend streaming API and two clients.
+
+#+BEGIN_SRC text
+                Google Drive
+               (music files)
+                      │
+                      ▼
+             ┌─────────────────┐
+             │ Playlisto       │
+             │ Backend API     │
+             │ (FastAPI)       │
+             └───────┬─────────┘
+                     │
+        ┌────────────┼────────────┐
+        ▼                           ▼
+  React Web Player           Kodi Addon
+  (frontend)                 plugin.audio.playlisto
+#+END_SRC
+
+The backend handles communication with Google Drive and streams audio to clients.
+
+Clients never connect to Google Drive directly.
+
+* Repository Structure
+
+#+BEGIN_SRC text
+playlisto/
+├── backend/
+├── frontend/
+├── plugin.audio.playlisto/
+├── addonsZip/
+├── logs/
+├── start.sh
+├── stop.sh
+└── README.org
+#+END_SRC
+
+** backend/
+
+Backend API responsible for Drive integration and streaming.
+
+#+BEGIN_SRC text
+backend/
+├── app
+│   ├── main.py
+│   ├── drive.py
+│   ├── streaming.py
+│   ├── storage.py
+│   └── models.py
+│
+├── data
+│   ├── folders.json
+│   ├── folders.enc
+│   ├── providers.enc
+│   ├── config.enc
+│   ├── sources.enc
+│   └── secret.key
+│
+├── requirements.txt
+└── setup
+    ├── arch.sh
+    ├── ubuntu.sh
+    └── termux.sh
+#+END_SRC
+
+** frontend/
+
+React application used as the web player.
+
+#+BEGIN_SRC text
+frontend/
+├── src
+│   ├── App.tsx
+│   ├── main.tsx
+│   ├── pages
+│   │   ├── PlayerPage.tsx
+│   │   └── SettingsSidebar.tsx
+│   └── assets
+│
+├── package.json
+└── vite.config.ts
+#+END_SRC
+
+** plugin.audio.playlisto/
+
+Kodi addon for streaming music from the Playlisto backend.
+
+#+BEGIN_SRC text
+plugin.audio.playlisto/
+├── addon.xml
+├── default.py
+├── api.py
+└── resources/settings.xml
+#+END_SRC
+
+* Backend Architecture
+
+The backend is implemented using FastAPI.
+
+Responsibilities include:
+
+- communicating with Google Drive API
+- retrieving folder contents
+- filtering audio files
+- streaming audio to clients
+- handling range requests
+
+Important modules:
+
+** main.py
+
+Entry point of the FastAPI server.
+
+Defines API routes such as:
+
+#+BEGIN_SRC text
+POST /load-folder
+GET  /folders
+GET  /stream/{file_id}
+#+END_SRC
+
+** drive.py
+
+Handles Google Drive API communication.
+
+Responsibilities:
+
+- extract folder IDs
+- query Google Drive API
+- filter supported audio files
+- build playlist metadata
+
+** streaming.py
+
+Handles streaming proxy logic.
+
+Flow:
+
+#+BEGIN_SRC text
+Client
+  │
+  ▼
+FastAPI /stream/{file_id}
+  │
+  ▼
+Google Drive download endpoint
+  │
+  ▼
+streamed chunks returned to client
+#+END_SRC
+
+This enables proper browser playback and seeking.
+
+** storage.py
+
+Handles local data persistence.
+
+Used for storing:
+
+- saved folders
+- providers
+- configuration
+- encryption keys
+
+* Frontend Architecture
+
+The frontend is built using React and Vite.
+
+Main responsibilities:
+
+- display playlist
+- audio playback
+- player controls
+- settings configuration
+
+Important components:
+
+** PlayerPage
+
+The main player interface.
+
+Features:
+
+- play and pause
+- next and previous track
+- track list
+- seek bar
+
+** SettingsSidebar
+
+Allows users to configure:
+
+- Google Drive folders
+- backend settings
+
+Audio playback uses the backend streaming endpoint.
+
+Example:
+
+#+BEGIN_SRC text
+http://localhost:8000/stream/{file_id}
+#+END_SRC
+
+* Kodi Addon
+
+Playlisto includes a Kodi addon allowing playback directly inside Kodi.
+
+Location:
+
+plugin.audio.playlisto/
+
+Important files:
+
+** addon.xml
+
+Defines addon metadata and entrypoints.
+
+** default.py
+
+Main addon script.
+
+Responsible for building Kodi navigation menus.
+
+** api.py
+
+Handles communication with the Playlisto backend API.
+
+Kodi streams audio using the same backend streaming endpoint.
+
+* Installation
+
+** Prerequisites
+
+- Python 3.10 or newer
+- Node.js 18 or newer
+- npm
+- Google Drive API key
+
+** Clone repository
+
+#+BEGIN_SRC bash
+git clone https://github.com/yourrepo/playlisto.git
+cd playlisto
+#+END_SRC
+
+** Setup backend
+
+#+BEGIN_SRC bash
+cd backend
+
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+#+END_SRC
+
+Run server:
+
+#+BEGIN_SRC bash
+uvicorn app.main:app --reload
+#+END_SRC
+
+Backend runs at:
+
+http://localhost:8000
+
+** Setup frontend
+
+#+BEGIN_SRC bash
+cd frontend
+
+npm install
+npm run dev
+#+END_SRC
+
+Frontend runs at:
+
+http://localhost:5173
+
+** Start full stack
+
+From project root:
+
+#+BEGIN_SRC bash
+./start.sh
+#+END_SRC
+
+Stop services:
+
+#+BEGIN_SRC bash
+./stop.sh
+#+END_SRC
+
+* Kodi Addon Installation
+
+Create zip archive:
+
+#+BEGIN_SRC bash
+zip -r plugin.audio.playlisto.zip plugin.audio.playlisto
+#+END_SRC
+
+Install inside Kodi:
+
+Settings → Add-ons → Install from zip file
+
+Configure backend URL inside addon settings.
+
+* Security Notes
+
+The Google Drive API key is used only by the backend.
+
+Never expose the API key in frontend code.
+
+Recommended restrictions:
+
+- restrict API key to Google Drive API
+- restrict by server IP
+
+* Future Improvements
+
+Possible future features:
+
+- metadata caching
+- album artwork
+- recursive folder traversal
+- playlist saving
+- mobile optimized UI
+- Docker deployment
+- additional storage providers
+
+* License
+
+MIT License
+
+* Contributing
+
+Contributions are welcome.
+
+Suggested workflow:
+
+#+BEGIN_SRC bash
+git checkout -b feature/my-feature
+git commit
+git push
+#+END_SRC
+
+Open a pull request.
 
