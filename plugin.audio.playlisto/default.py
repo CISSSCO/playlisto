@@ -1,52 +1,34 @@
 import sys
-import json
-import urllib.request
 import urllib.parse
 
 import xbmcplugin
 import xbmcgui
 import xbmcaddon
 
+import api
+
+
 addon = xbmcaddon.Addon()
 addon_handle = int(sys.argv[1])
 
-BASE_URL = addon.getSetting("server")
 
-xbmcplugin.setContent(addon_handle, "songs")
+params = dict(
+    urllib.parse.parse_qsl(sys.argv[2][1:])
+)
 
-
-def fetch_playlist():
-
-    url = BASE_URL + "/api/load-folder"
-
-    req = urllib.request.Request(url, method="POST")
-
-    try:
-        response = urllib.request.urlopen(req)
-        data = json.loads(response.read().decode())
-
-        return data.get("files", [])
-
-    except Exception:
-
-        xbmcgui.Dialog().notification(
-            "Playlisto",
-            "Failed to load source",
-            xbmcgui.NOTIFICATION_ERROR,
-            4000
-        )
-
-        return []
+action = params.get("action")
 
 
-def list_songs():
+def play_active():
 
-    songs = fetch_playlist()
+    data = api.post("/api/load-folder")
 
-    for file in songs:
+    files = data.get("files", [])
 
-        stream_url = (
-            BASE_URL
+    for file in files:
+
+        stream = (
+            addon.getSetting("server")
             + "/api/stream/"
             + file["id"]
             + "?filename="
@@ -58,7 +40,7 @@ def list_songs():
 
         xbmcplugin.addDirectoryItem(
             handle=addon_handle,
-            url=stream_url,
+            url=stream,
             listitem=li,
             isFolder=False
         )
@@ -66,5 +48,99 @@ def list_songs():
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-if __name__ == "__main__":
-    list_songs()
+def add_provider():
+
+    dialog = xbmcgui.Dialog()
+
+    name = dialog.input("Provider Name")
+
+    api_key = dialog.input("Google Drive API Key")
+
+    api.post(
+        "/api/providers",
+        {"name": name, "api_key": api_key}
+    )
+
+    dialog.notification("Playlisto", "Provider added")
+
+
+def list_providers():
+
+    data = api.get("/api/providers")
+
+    names = [p["name"] for p in data]
+
+    dialog = xbmcgui.Dialog()
+
+    i = dialog.select("Activate Provider", names)
+
+    if i >= 0:
+
+        api.post("/api/providers/activate/" + data[i]["id"])
+
+        dialog.notification("Playlisto", "Provider activated")
+
+
+def add_source():
+
+    dialog = xbmcgui.Dialog()
+
+    name = dialog.input("Source Name")
+
+    url = dialog.input("Google Drive Folder URL")
+
+    providers = api.get("/api/providers")
+
+    provider_names = [p["name"] for p in providers]
+
+    i = dialog.select("Select Provider", provider_names)
+
+    if i < 0:
+        return
+
+    api.post(
+        "/api/sources",
+        {
+            "name": name,
+            "url": url,
+            "provider_id": providers[i]["id"]
+        }
+    )
+
+    dialog.notification("Playlisto", "Source added")
+
+
+def list_sources():
+
+    data = api.get("/api/sources")
+
+    names = [s["name"] for s in data["sources"]]
+
+    dialog = xbmcgui.Dialog()
+
+    i = dialog.select("Activate Source", names)
+
+    if i >= 0:
+
+        api.post(
+            "/api/sources/activate/"
+            + data["sources"][i]["id"]
+        )
+
+        dialog.notification("Playlisto", "Source activated")
+
+
+if action == "add_provider":
+    add_provider()
+
+elif action == "list_providers":
+    list_providers()
+
+elif action == "add_source":
+    add_source()
+
+elif action == "list_sources":
+    list_sources()
+
+else:
+    play_active()

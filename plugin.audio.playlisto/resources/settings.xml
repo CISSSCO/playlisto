@@ -1,8 +1,47 @@
 <settings>
-    <category label="Playlisto Server">
+
+    <category label="Server">
+
         <setting id="server"
                  type="text"
-                 label="Server Address"
-                 default="http://192.168.0.116:8000"/>
+                 label="Playlisto Server URL"
+                 default="http://192.168.0.113:8000"/>
+
     </category>
+
+
+    <category label="Providers">
+
+        <setting id="add_provider"
+                 type="action"
+                 label="Add Google Drive Provider"
+                 action="RunPlugin(plugin://plugin.audio.playlisto/?action=add_provider)"/>
+
+        <setting id="list_providers"
+                 type="action"
+                 label="Activate Provider"
+                 action="RunPlugin(plugin://plugin.audio.playlisto/?action=list_providers)"/>
+
+    </category>
+
+
+    <category label="Sources">
+
+        <setting id="add_source"
+                 type="action"
+                 label="Add Source"
+                 action="RunPlugin(plugin://plugin.audio.playlisto/?action=add_source)"/>
+
+        <setting id="activate_source"
+                 type="action"
+                 label="Activate Source"
+                 action="RunPlugin(plugin://plugin.audio.playlisto/?action=list_sources)"/>
+
+        <setting id="remove_source"
+                 type="action"
+                 label="Remove Source"
+                 action="RunPlugin(plugin://plugin.audio.playlisto/?action=remove_source)"/>
+
+    </category>
+
 </settings>
