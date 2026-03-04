@@ -1,0 +1,8 @@
+<settings>
+    <category label="Playlisto Server">
+        <setting id="server"
+                 type="text"
+                 label="Server Address"
+                 default="http://192.168.0.116:8000"/>
+    </category>
+</settings>
