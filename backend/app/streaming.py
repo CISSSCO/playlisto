@@ -1,9 +1,20 @@
 import httpx
 import re
+import asyncio
 from fastapi import Request
 from fastapi.responses import StreamingResponse, Response
 
 CHUNK_SIZE = 1024 * 1024
+
+# Reusable global HTTP client (important for performance)
+client = httpx.AsyncClient(
+    follow_redirects=True,
+    timeout=None,
+    limits=httpx.Limits(
+        max_keepalive_connections=20,
+        max_connections=50
+    ),
+)
 
 
 async def stream_file(file_id: str, filename: str, request: Request):
@@ -21,69 +32,76 @@ async def stream_file(file_id: str, filename: str, request: Request):
     if range_header:
         headers["Range"] = range_header
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:
+    response = await client.get(
+        base_url,
+        params=params,
+        headers=headers,
+    )
 
-        response = await client.get(
-            base_url,
-            params=params,
-            headers=headers,
-        )
+    # Handle Google Drive large file confirmation
+    if "text/html" in response.headers.get("content-type", ""):
+        match = re.search(r"confirm=([0-9A-Za-z_]+)", response.text)
 
-        # Handle Google Drive large file confirmation
-        if "text/html" in response.headers.get("content-type", ""):
-            match = re.search(r"confirm=([0-9A-Za-z_]+)", response.text)
+        if match:
+            confirm_token = match.group(1)
+            params["confirm"] = confirm_token
 
-            if match:
-                confirm_token = match.group(1)
-                params["confirm"] = confirm_token
-
-                response = await client.get(
-                    base_url,
-                    params=params,
-                    headers=headers,
-                )
-
-        # HEAD request handling (Kodi probe)
-        if request.method == "HEAD":
-            head_headers = {
-                "Accept-Ranges": "bytes",
-                "Content-Type": response.headers.get("content-type", "audio/flac"),
-            }
-
-            if "content-length" in response.headers:
-                head_headers["Content-Length"] = response.headers["content-length"]
-
-            if "content-range" in response.headers:
-                head_headers["Content-Range"] = response.headers["content-range"]
-
-            return Response(
-                status_code=response.status_code,
-                headers=head_headers,
+            response = await client.get(
+                base_url,
+                params=params,
+                headers=headers,
             )
 
-        async def file_iterator():
-            async for chunk in response.aiter_bytes(CHUNK_SIZE):
-                yield chunk
-
-        status_code = response.status_code
-
-        # If range requested but Google returned full response
-        if range_header and status_code == 200:
-            status_code = 206
-
-        stream_headers = {
-            "Content-Type": response.headers.get("content-type", "audio/flac"),
+    # Kodi probe support
+    if request.method == "HEAD":
+        head_headers = {
             "Accept-Ranges": "bytes",
+            "Content-Type": response.headers.get(
+                "content-type",
+                "audio/flac"
+            ),
         }
 
         if "content-length" in response.headers:
-            stream_headers["Content-Length"] = response.headers["content-length"]
+            head_headers["Content-Length"] = response.headers["content-length"]
 
         if "content-range" in response.headers:
-            stream_headers["Content-Range"] = response.headers["content-range"]
+            head_headers["Content-Range"] = response.headers["content-range"]
 
-        return StreamingResponse(
-            file_iterator(),
-            status_code=status_code,
-            headers=stream_headers,
+        return Response(
+            status_code=response.status_code,
+            headers=head_headers,
         )
+
+    async def file_iterator():
+        try:
+            async for chunk in response.aiter_bytes(CHUNK_SIZE):
+                yield chunk
+        except asyncio.CancelledError:
+            # Kodi often disconnects while probing
+            return
+
+    status_code = response.status_code
+
+    if range_header and status_code == 200:
+        status_code = 206
+
+    stream_headers = {
+        "Content-Type": response.headers.get(
+            "content-type",
+            "audio/flac"
+        ),
+        "Accept-Ranges": "bytes",
+    }
+
+    if "content-length" in response.headers:
+        stream_headers["Content-Length"] = response.headers["content-length"]
+
+    if "content-range" in response.headers:
+        stream_headers["Content-Range"] = response.headers["content-range"]
+
+    return StreamingResponse(
+        file_iterator(),
+        status_code=status_code,
+        headers=stream_headers,
+    )
