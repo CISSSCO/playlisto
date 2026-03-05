@@ -1,18 +1,21 @@
 import httpx
+import re
 from fastapi import Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 
 CHUNK_SIZE = 1024 * 1024
 
 
 async def stream_file(file_id: str, filename: str, request: Request):
     base_url = "https://drive.google.com/uc"
+
     params = {
         "export": "download",
         "id": file_id,
     }
 
     headers = {}
+
     range_header = request.headers.get("range")
 
     if range_header:
@@ -26,10 +29,10 @@ async def stream_file(file_id: str, filename: str, request: Request):
             headers=headers,
         )
 
-        # Large file confirmation handling
+        # Handle Google Drive large file confirmation
         if "text/html" in response.headers.get("content-type", ""):
-            import re
             match = re.search(r"confirm=([0-9A-Za-z_]+)", response.text)
+
             if match:
                 confirm_token = match.group(1)
                 params["confirm"] = confirm_token
@@ -40,29 +43,47 @@ async def stream_file(file_id: str, filename: str, request: Request):
                     headers=headers,
                 )
 
+        # HEAD request handling (Kodi probe)
+        if request.method == "HEAD":
+            head_headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Type": response.headers.get("content-type", "audio/flac"),
+            }
+
+            if "content-length" in response.headers:
+                head_headers["Content-Length"] = response.headers["content-length"]
+
+            if "content-range" in response.headers:
+                head_headers["Content-Range"] = response.headers["content-range"]
+
+            return Response(
+                status_code=response.status_code,
+                headers=head_headers,
+            )
+
         async def file_iterator():
             async for chunk in response.aiter_bytes(CHUNK_SIZE):
                 yield chunk
 
-        # IMPORTANT FIX:
         status_code = response.status_code
 
-        # If browser requested range but Google returned 200,
-        # convert it to 206 manually
+        # If range requested but Google returned full response
         if range_header and status_code == 200:
             status_code = 206
+
+        stream_headers = {
+            "Content-Type": response.headers.get("content-type", "audio/flac"),
+            "Accept-Ranges": "bytes",
+        }
+
+        if "content-length" in response.headers:
+            stream_headers["Content-Length"] = response.headers["content-length"]
+
+        if "content-range" in response.headers:
+            stream_headers["Content-Range"] = response.headers["content-range"]
 
         return StreamingResponse(
             file_iterator(),
             status_code=status_code,
-            headers={
-
-                 "Content-Type": response.headers.get(
-                     "content-type",
-                     "audio/flac"
-                 ),
-                "Accept-Ranges": "bytes",
-                "Content-Length": response.headers.get("content-length", ""),
-                "Content-Range": response.headers.get("content-range", ""),
-            },
+            headers=stream_headers,
         )
