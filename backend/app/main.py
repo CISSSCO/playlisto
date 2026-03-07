@@ -45,7 +45,7 @@ async def load_folder():
         "files": [f.dict() for f in files],
     }
 
-@app.get("/api/stream/{file_id}")
+@app.api_route("/api/stream/{file_id}", methods=["GET", "HEAD"])
 async def stream(file_id: str, filename: str, request: Request):
     return await stream_file(file_id, filename, request)
 
