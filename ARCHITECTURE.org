@@ -1,0 +1,180 @@
+#+TITLE: Playlisto Architecture
+#+AUTHOR: Playlisto Project
+#+OPTIONS: toc:3 num:t
+#+STARTUP: overview
+
+* System Overview
+
+Playlisto is a self-hosted music streaming system built around a backend streaming proxy.
+
+The system enables streaming audio files stored in Google Drive to multiple clients.
+
+Clients never interact with Google Drive directly. Instead, they communicate with the Playlisto backend which acts as a gateway.
+
+The architecture consists of three primary components:
+
+- Backend API server
+- Web frontend player
+- Kodi addon client
+
+* Architecture Diagram
+
+#+BEGIN_SRC text
+                Google Drive
+               (music files)
+                      │
+                      ▼
+             ┌─────────────────┐
+             │ Playlisto       │
+             │ Backend API     │
+             │ FastAPI         │
+             └───────┬─────────┘
+                     │
+        ┌────────────┼────────────┐
+        ▼                           ▼
+  Web Player (React)        Kodi Addon
+  frontend/                 plugin.audio.playlisto
+#+END_SRC
+
+* Backend Architecture
+
+The backend is responsible for:
+
+- querying Google Drive API
+- retrieving folder contents
+- filtering audio files
+- streaming audio
+- managing configuration
+- acting as a proxy for clients
+
+Core modules:
+
+** main.py
+
+Entry point of the FastAPI server.
+
+Defines API endpoints and application lifecycle.
+
+Example endpoints:
+
+#+BEGIN_SRC text
+POST /load-folder
+GET  /folders
+GET  /stream/{file_id}
+#+END_SRC
+
+** drive.py
+
+Responsible for interacting with the Google Drive API.
+
+Responsibilities:
+
+- extracting folder IDs
+- querying Drive API
+- filtering audio files
+- generating playlists
+
+** streaming.py
+
+Responsible for proxy streaming.
+
+Streaming flow:
+
+#+BEGIN_SRC text
+client request
+   │
+   ▼
+FastAPI /stream endpoint
+   │
+   ▼
+Google Drive download endpoint
+   │
+   ▼
+stream chunks returned to client
+#+END_SRC
+
+Range headers are forwarded to support seeking.
+
+** storage.py
+
+Handles persistent storage.
+
+Data includes:
+
+- saved folders
+- providers
+- encrypted configuration
+- API settings
+
+* Frontend Architecture
+
+The web interface is built with:
+
+- React
+- TypeScript
+- Vite
+
+Responsibilities:
+
+- display playlists
+- audio playback
+- user interface
+- settings management
+
+Important components:
+
+PlayerPage
+
+Main audio player interface.
+
+SettingsSidebar
+
+Configuration UI for folders and providers.
+
+Audio playback uses the backend streaming endpoint.
+
+* Kodi Addon Architecture
+
+Kodi addon allows playback directly inside Kodi.
+
+Main files:
+
+addon.xml
+
+Addon metadata and entrypoint configuration.
+
+default.py
+
+Main Kodi plugin logic.
+
+api.py
+
+Handles communication with the Playlisto backend.
+
+Kodi loads playlists from the backend and streams tracks through the proxy endpoint.
+
+* Data Storage
+
+Configuration and metadata are stored in backend/data.
+
+Files include:
+
+folders.json
+folders.enc
+providers.enc
+config.enc
+sources.enc
+secret.key
+
+Some configuration is encrypted to protect sensitive settings.
+
+* Security Model
+
+Security considerations include:
+
+- API key stored server-side and encrypted
+- encrypted configuration storage
+- no direct client access to Google Drive
+
+Clients only communicate with the backend API.
+

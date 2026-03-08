@@ -1,0 +1,74 @@
+#+TITLE: Playlisto Contributing Guide
+#+AUTHOR: Playlisto Project
+#+OPTIONS: toc:2 num:t
+#+STARTUP: overview
+
+* Contributing
+
+Contributions are welcome.
+
+Possible contribution areas:
+
+- backend improvements
+- frontend features
+- UI enhancements
+- Kodi addon improvements
+- documentation
+
+* Development Workflow
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Implement changes.
+4. Commit changes.
+5. Open a pull request.
+
+Example:
+
+#+BEGIN_SRC bash
+git checkout -b feature/my-feature
+git commit
+git push origin feature/my-feature
+#+END_SRC
+
+* Commit Guidelines
+
+Write clear commit messages.
+
+Example format:
+
+#+BEGIN_SRC text
+component: short description
+
+longer explanation if necessary
+#+END_SRC
+
+Example:
+
+#+BEGIN_SRC text
+backend: add range support for FLAC streaming
+#+END_SRC
+
+* Pull Requests
+
+Pull requests should:
+
+- describe the change
+- explain the motivation
+- include screenshots if UI changes are involved
+
+* Reporting Issues
+
+Issues should include:
+
+- steps to reproduce
+- expected behavior
+- actual behavior
+- logs if available
+
+* Code of Conduct
+
+Be respectful and constructive.
+
+Focus on improving the project.
+

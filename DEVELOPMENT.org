@@ -1,0 +1,148 @@
+#+TITLE: Playlisto Development Guide
+#+AUTHOR: Playlisto Project
+#+OPTIONS: toc:3 num:t
+#+STARTUP: overview
+
+* Development Overview
+
+Playlisto consists of multiple components developed independently.
+
+Main development areas:
+
+- backend API
+- frontend web interface
+- Kodi addon
+
+Each component can be developed and tested separately.
+
+* Development Environment
+
+Required tools:
+
+Python 3.10+
+Node.js 18+
+npm
+Git
+
+Optional tools:
+
+Docker
+Kodi development environment
+
+* Backend Development
+
+Backend uses:
+
+FastAPI
+httpx
+pydantic
+
+Directory:
+
+backend/app/
+
+Run backend in development mode:
+
+#+BEGIN_SRC bash
+cd backend
+
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+
+uvicorn app.main:app --reload
+#+END_SRC
+
+Server runs at:
+
+http://localhost:8000
+
+* Frontend Development
+
+Frontend uses:
+
+React
+TypeScript
+Vite
+
+Run development server:
+
+#+BEGIN_SRC bash
+cd frontend
+
+npm install
+npm run dev
+#+END_SRC
+
+Development server:
+
+http://localhost:5173
+
+* Kodi Addon Development
+
+Addon located in:
+
+plugin.audio.playlisto/
+
+To test in Kodi:
+
+copy addon directory to Kodi addons folder
+
+or install zip package.
+
+Kodi log file can be used for debugging.
+
+* Running Full Stack
+
+Start backend and frontend together using project scripts.
+
+#+BEGIN_SRC bash
+./start.sh
+#+END_SRC
+
+Stop services:
+
+#+BEGIN_SRC bash
+./stop.sh
+#+END_SRC
+
+* Code Style
+
+General guidelines:
+
+- keep modules small and focused
+- avoid unnecessary dependencies
+- document public functions
+- keep API stable
+
+Python formatting:
+
+black
+ruff
+
+Frontend formatting:
+
+eslint
+prettier
+
+* Debugging
+
+Backend logs appear in terminal.
+
+Frontend errors appear in browser console.
+
+Kodi addon logs appear in Kodi log file.
+
+* Testing
+
+Testing areas include:
+
+- Drive API integration
+- streaming proxy behavior
+- frontend playback
+- Kodi integration
+
+Manual testing is currently used.
+
+Automated tests may be added later.

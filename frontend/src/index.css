@@ -18,7 +18,7 @@ body {
     radial-gradient(circle at 80% 80%, #00d4ff, transparent 40%),
     linear-gradient(135deg, #5f6fff, #00c6ff);
     */
-    background: url("/bg2.svg");
+    background: url("/bg4.svg");
     background-repeat: no-repeat; /* Prevents image tiling */
     background-size: cover;
 }

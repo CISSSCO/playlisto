@@ -1,0 +1,21 @@
+<addon id="plugin.audio.playlisto"
+       name="Playlisto"
+       version="2.0.0"
+       provider-name="Playlisto">
+
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+    </requires>
+
+    <extension point="xbmc.python.pluginsource"
+               library="default.py">
+        <provides>audio</provides>
+    </extension>
+
+    <extension point="xbmc.addon.metadata">
+        <summary>Playlisto Music Server</summary>
+        <description>Stream music from Playlisto backend</description>
+        <platform>all</platform>
+    </extension>
+
+</addon>

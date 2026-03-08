@@ -13,6 +13,7 @@ from .storage import (
     load_sources,
     activate_source,
     add_provider,
+    get_active_source,   
     get_providers_metadata,
     set_active_provider,
 )
@@ -33,26 +34,18 @@ app.add_middleware(
 
 @app.post("/api/load-folder")
 async def load_folder():
+    active_source = get_active_source()
+    if not active_source:
+        raise HTTPException(status_code=400, detail="No active source configured")
+
     files = await fetch_folder_files()
 
-    data = load_data()
-
-    folder_entry = {
-        "name": "Active Source",
+    return {
+        "name": active_source.get("name"),  # IMPORTANT
         "files": [f.dict() for f in files],
     }
 
-    data["last_folder"] = "active_source"
-    data["folders"] = [folder_entry]
-
-    save_data(data)
-
-    return {
-        "name": folder_entry["name"],
-        "files": folder_entry["files"],
-    }
-
-@app.get("/api/stream/{file_id}")
+@app.api_route("/api/stream/{file_id}", methods=["GET", "HEAD"])
 async def stream(file_id: str, filename: str, request: Request):
     return await stream_file(file_id, filename, request)
 

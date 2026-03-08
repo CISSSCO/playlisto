@@ -35,7 +35,11 @@ async def fetch_folder_recursive(client, folder_id, api_key):
 
     for item in data.get("files", []):
         if item["mimeType"] == "application/vnd.google-apps.folder":
-            sub = await fetch_folder_recursive(client, item["id"], api_key)
+            sub = await fetch_folder_recursive(
+                client,
+                item["id"],
+                api_key
+            )
             files.extend(sub)
 
         elif item["name"].lower().endswith(AUDIO_EXTENSIONS):
@@ -69,6 +73,10 @@ async def fetch_folder_files():
     folder_id = extract_folder_id(folder_url)
 
     async with httpx.AsyncClient(timeout=60) as client:
-        files = await fetch_folder_recursive(client, folder_id, api_key)
+        files = await fetch_folder_recursive(
+            client,
+            folder_id,
+            api_key
+        )
 
     return files

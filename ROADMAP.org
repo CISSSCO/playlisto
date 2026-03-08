@@ -1,0 +1,83 @@
+#+TITLE: Playlisto Roadmap
+#+AUTHOR: Playlisto Project
+#+OPTIONS: toc:2 num:t
+#+STARTUP: overview
+
+* Project Goals
+
+Playlisto aims to provide a simple self-hosted music streaming solution for personal cloud libraries.
+
+The focus is on:
+
+- reliability
+- simplicity
+- extensibility
+
+* Short Term Goals
+
+Improve stability and usability.
+
+Tasks include:
+
+- improve error handling
+- improve UI responsiveness
+- better folder management
+- improved playback controls
+
+* Medium Term Goals
+
+Add new functionality.
+
+Possible features:
+
+- album artwork support
+- metadata caching
+- recursive folder traversal
+- playlist creation
+- better mobile UI
+
+* Long Term Goals
+
+Expand platform capabilities.
+
+Ideas include:
+
+- multi-provider storage support
+- S3 support
+- Dropbox support
+- multi-user support
+- authentication
+- mobile application
+
+* Infrastructure Improvements
+
+Future infrastructure tasks:
+
+- Docker deployment
+- automated builds
+- CI pipelines
+
+* Community Goals
+
+Encourage contributions and community development.
+
+Possible improvements:
+
+- plugin architecture
+- extension system
+- documentation improvements
+
+* Version Milestones
+
+Version 0.1
+
+Initial working system.
+
+Version 0.2
+
+Improved UI and playback stability.
+
+Version 1.0
+
+Stable self-hosted music streaming platform.
+
