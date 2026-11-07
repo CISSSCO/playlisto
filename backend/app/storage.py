@@ -32,13 +32,33 @@ def get_cipher():
 
 def load_data():
     if not DATA_PATH.exists():
-        return {"last_folder": None, "folders": []}
-    return json.loads(DATA_PATH.read_text())
+        return {"last_folder": None, "folders_cache": {}}
+    try:
+        return json.loads(DATA_PATH.read_text())
+    except Exception:
+        return {"last_folder": None, "folders_cache": {}}
 
 
 def save_data(data):
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     DATA_PATH.write_text(json.dumps(data, indent=2))
+
+
+def get_cached_playlist(source_id: str):
+    data = load_data()
+    cache = data.get("folders_cache", {})
+    return cache.get(source_id)
+
+
+def set_cached_playlist(source_id: str, name: str, files: list):
+    data = load_data()
+    if "folders_cache" not in data:
+        data["folders_cache"] = {}
+    data["folders_cache"][source_id] = {
+        "name": name,
+        "files": files,
+    }
+    save_data(data)
 
 # =====================================================
 # PROVIDERS (Encrypted API Keys)

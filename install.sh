@@ -3,7 +3,7 @@ set -e
 
 # ==============================================================================
 # Playlisto - Automated Unified Installer
-# Supports: Arch Linux, Ubuntu / Debian, and derivatives
+# Supports: Arch Linux, Ubuntu / Debian, PRoot Linux, and Termux
 # ==============================================================================
 
 # Terminal Colors
@@ -41,7 +41,7 @@ fi
 echo -e "${BLUE}📁 Project directory:${NC} $ROOT_DIR"
 
 # ==============================================================================
-# 2. Operating System Detection
+# 2. Operating System & Privilege Detection
 # ==============================================================================
 echo -e "\n${CYAN}🔍 Detecting Operating System...${NC}"
 
@@ -64,50 +64,173 @@ fi
 
 echo -e "   Detected: ${BOLD}$DISTRO_NAME${NC} (Type: ${GREEN}$OS_TYPE${NC})"
 
-if [ "$OS_TYPE" == "unknown" ]; then
-    echo -e "${YELLOW}⚠️  Warning: OS not explicitly recognized as Arch or Ubuntu/Debian.${NC}"
-    echo "Attempting to continue using installed system binaries..."
+# Sudo helper (handles root in PRoot/Termux vs standard user)
+if [ "$EUID" -eq 0 ]; then
+    SUDO=""
+elif command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+elif command -v doas >/dev/null 2>&1; then
+    SUDO="doas"
+else
+    SUDO=""
 fi
 
 # ==============================================================================
-# 3. System Dependencies Check / Install
+# 3. System Dependencies Check & Fix (with runtime tests)
 # ==============================================================================
 echo -e "\n${CYAN}📦 Checking system dependencies...${NC}"
 
-MISSING_PKGS=()
-
-command -v python3 >/dev/null 2>&1 || MISSING_PKGS+=("python3")
-command -v node >/dev/null 2>&1 || MISSING_PKGS+=("nodejs")
-command -v npm >/dev/null 2>&1 || MISSING_PKGS+=("npm")
-command -v git >/dev/null 2>&1 || MISSING_PKGS+=("git")
-
-if [ ${#MISSING_PKGS[@]} -eq 0 ]; then
-    echo -e "   ${GREEN}✓ All core binaries found:${NC} python3 ($(python3 -V 2>&1)), node ($(node -v 2>&1)), npm ($(npm -v 2>&1)), git"
-else
-    echo -e "   ${YELLOW}Missing tools: ${MISSING_PKGS[*]}${NC}"
-    echo -e "   Installing missing packages..."
-
-    if [ "$OS_TYPE" == "arch" ]; then
-        if [ "$EUID" -ne 0 ]; then
-            sudo pacman -Sy --needed --noconfirm python python-pip nodejs npm git make gcc openssl libffi pkg-config
-        else
-            pacman -Sy --needed --noconfirm python python-pip nodejs npm git make gcc openssl libffi pkg-config
-        fi
-    elif [ "$OS_TYPE" == "ubuntu" ]; then
-        if [ "$EUID" -ne 0 ]; then
-            sudo apt update -y
-            sudo apt install -y python3 python3-pip python3-venv nodejs npm git make gcc libssl-dev libffi-dev pkg-config
-        else
-            apt update -y
-            apt install -y python3 python3-pip python3-venv nodejs npm git make gcc libssl-dev libffi-dev pkg-config
-        fi
-    elif [ "$OS_TYPE" == "termux" ]; then
-        pkg update -y
-        pkg install -y python nodejs git make clang openssl libffi
-    else
-        echo -e "${RED}❌ Please install the missing packages manually: ${MISSING_PKGS[*]}${NC}"
-        exit 1
+# Helper function to test if npm is actually functional (not broken by glob/esm errors)
+is_npm_working() {
+    if ! command -v npm >/dev/null 2>&1; then
+        return 1
     fi
+    # Execute npm --version and check exit code without dumping node stacktrace
+    if npm --version >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Helper function to test if python venv module is usable
+is_venv_working() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        return 1
+    fi
+    if python3 -c "import venv, ensurepip" >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to fix/install broken or missing npm
+fix_or_install_npm() {
+    echo -e "\n${YELLOW}⚠️  Node.js or npm is missing or broken (e.g. missing glob / CJS module error).${NC}"
+    read -rp "Would you like to install/fix Node.js and npm automatically? [Y/n]: " fix_npm_choice
+    case "$fix_npm_choice" in
+        [nN][oO]|[nN])
+            echo -e "${YELLOW}Skipping npm fix. Note: Frontend build may fail if npm is non-functional.${NC}"
+            return 1
+            ;;
+        *)
+            echo -e "${CYAN}Attempting to repair Node.js and npm...${NC}"
+            if [ "$OS_TYPE" == "ubuntu" ]; then
+                # First try reinstalling via apt
+                $SUDO apt update -y || true
+                $SUDO apt install --reinstall -y nodejs npm || true
+
+                # If still broken, install clean NodeSource Node.js LTS
+                if ! is_npm_working; then
+                    echo -e "${YELLOW}Apt npm package is incompatible with installed Node. Installing NodeSource Node.js LTS...${NC}"
+                    if command -v curl >/dev/null 2>&1; then
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO bash -
+                        $SUDO apt install -y nodejs
+                    elif command -v wget >/dev/null 2>&1; then
+                        wget -qO- https://deb.nodesource.com/setup_20.x | $SUDO bash -
+                        $SUDO apt install -y nodejs
+                    fi
+                fi
+            elif [ "$OS_TYPE" == "arch" ]; then
+                $SUDO pacman -Sy --needed --noconfirm nodejs npm
+            elif [ "$OS_TYPE" == "termux" ]; then
+                pkg install -y nodejs
+            fi
+
+            if is_npm_working; then
+                echo -e "${GREEN}✓ npm is now working successfully ($(npm --version))!${NC}"
+                return 0
+            else
+                echo -e "${RED}❌ Could not automatically repair npm. Please check your Node/npm installation.${NC}"
+                return 1
+            fi
+            ;;
+    esac
+}
+
+# Function to install missing python3-venv
+install_python_venv() {
+    echo -e "\n${YELLOW}⚠️  Python virtual environment module (python3-venv / ensurepip) is not installed.${NC}"
+    read -rp "Would you like to install python3-venv now? [Y/n]: " install_venv_choice
+    case "$install_venv_choice" in
+        [nN][oO]|[nN])
+            echo -e "${RED}❌ Python virtual environment support is required. Exiting.${NC}"
+            exit 1
+            ;;
+        *)
+            echo -e "${CYAN}Installing Python virtual environment packages...${NC}"
+            if [ "$OS_TYPE" == "ubuntu" ]; then
+                $SUDO apt update -y || true
+                $SUDO apt install -y python3-venv python3-pip
+            elif [ "$OS_TYPE" == "arch" ]; then
+                $SUDO pacman -Sy --needed --noconfirm python python-pip
+            elif [ "$OS_TYPE" == "termux" ]; then
+                pkg install -y python
+            else
+                echo -e "${RED}❌ Please install python3-venv manually for your system.${NC}"
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# 3.1 Check Python
+if ! command -v python3 >/dev/null 2>&1; then
+    echo -e "${YELLOW}Python 3 is not installed.${NC}"
+    read -rp "Would you like to install Python 3 now? [Y/n]: " install_py_choice
+    case "$install_py_choice" in
+        [nN][oO]|[nN])
+            echo -e "${RED}❌ Python 3 is required. Exiting.${NC}"
+            exit 1
+            ;;
+        *)
+            if [ "$OS_TYPE" == "ubuntu" ]; then
+                $SUDO apt update -y && $SUDO apt install -y python3 python3-pip python3-venv
+            elif [ "$OS_TYPE" == "arch" ]; then
+                $SUDO pacman -Sy --needed --noconfirm python python-pip
+            elif [ "$OS_TYPE" == "termux" ]; then
+                pkg install -y python
+            fi
+            ;;
+    esac
+fi
+
+# 3.2 Check venv capability
+if ! is_venv_working; then
+    install_python_venv
+fi
+
+# 3.3 Check Node & NPM
+if ! is_npm_working; then
+    fix_or_install_npm || true
+fi
+
+# 3.4 Check Git
+if ! command -v git >/dev/null 2>&1; then
+    echo -e "${YELLOW}Git is not installed.${NC}"
+    read -rp "Would you like to install git now? [Y/n]: " install_git_choice
+    case "$install_git_choice" in
+        [nN][oO]|[nN]) ;;
+        *)
+            if [ "$OS_TYPE" == "ubuntu" ]; then
+                $SUDO apt install -y git
+            elif [ "$OS_TYPE" == "arch" ]; then
+                $SUDO pacman -Sy --needed --noconfirm git
+            elif [ "$OS_TYPE" == "termux" ]; then
+                pkg install -y git
+            fi
+            ;;
+    esac
+fi
+
+# Display summary of detected tools
+echo -e "   ${GREEN}✓ Python:${NC} $(python3 -V 2>&1)"
+if command -v node >/dev/null 2>&1; then
+    echo -e "   ${GREEN}✓ Node.js:${NC} $(node -v 2>&1)"
+fi
+if is_npm_working; then
+    echo -e "   ${GREEN}✓ npm:${NC} v$(npm --version 2>&1)"
 fi
 
 # ==============================================================================
@@ -118,19 +241,32 @@ cd "$ROOT_DIR/backend"
 
 VENV_DIR="$ROOT_DIR/backend/.playlisto"
 
-if [ ! -d "$VENV_DIR" ]; then
+if [ -d "$VENV_DIR" ]; then
+    echo -e "   ${YELLOW}📁 Existing virtual environment found at:${NC} backend/.playlisto"
+    read -rp "   Do you want to remove it and create a fresh one? [y/N]: " overwrite_venv
+    case "$overwrite_venv" in
+        [yY][eE][sS]|[yY])
+            echo -e "   ${CYAN}🗑️  Removing existing virtual environment...${NC}"
+            rm -rf "$VENV_DIR"
+            echo "   Creating new Python virtual environment in backend/.playlisto..."
+            python3 -m venv "$VENV_DIR"
+            ;;
+        *)
+            echo "   Keeping and using existing virtual environment."
+            ;;
+    esac
+else
     echo "   Creating Python virtual environment in backend/.playlisto..."
     python3 -m venv "$VENV_DIR"
-else
-    echo "   Existing virtual environment detected in backend/.playlisto."
 fi
 
-# Activate venv
+# Activate virtual environment
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
+# Check if packages are already installed or need install
 if python -c "import fastapi, uvicorn, httpx, cryptography, mutagen" >/dev/null 2>&1; then
-    echo "   ✓ Required Python packages are already installed."
+    echo -e "   ${GREEN}✓ Required Python packages are already installed.${NC}"
 else
     echo "   Installing backend requirements from requirements.txt..."
     pip install --upgrade pip setuptools wheel --quiet 2>/dev/null || true
@@ -151,21 +287,26 @@ python -c "import app.main; print('   ✓ Backend modules verified successfully.
 echo -e "\n${CYAN}⚛️  Setting up React frontend...${NC}"
 cd "$ROOT_DIR/frontend"
 
-if [ -d "node_modules" ] && [ -f "node_modules/.bin/vite" ]; then
-    echo "   ✓ Node modules are already installed."
-else
-    echo "   Installing Node dependencies (npm install)..."
-    npm install --quiet
-fi
+if is_npm_working; then
+    if [ -d "node_modules" ] && [ -f "node_modules/.bin/vite" ]; then
+        echo -e "   ${GREEN}✓ Node modules are already installed.${NC}"
+    else
+        echo "   Installing Node dependencies (npm install)..."
+        npm install --quiet
+    fi
 
-echo "   Building frontend for production (npm run build)..."
-npm run build --quiet
-echo "   ✓ Frontend built into frontend/dist"
+    echo "   Building frontend for production (npm run build)..."
+    npm run build --quiet
+    echo -e "   ${GREEN}✓ Frontend built into frontend/dist${NC}"
+else
+    echo -e "${YELLOW}⚠️  npm is currently not functional. Skipping frontend build step.${NC}"
+    echo "You can build the frontend later with 'npm install && npm run build' once npm is repaired."
+fi
 
 # ==============================================================================
 # 6. Ensure Permissions on Control Scripts
 # ==============================================================================
-chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/stop.sh" 2>/dev/null || true
+chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/stop.sh" "$ROOT_DIR/install.sh" 2>/dev/null || true
 
 # ==============================================================================
 # 7. Installation Complete & Instructions

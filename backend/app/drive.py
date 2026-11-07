@@ -2,6 +2,7 @@ import re
 import httpx
 from .models import DriveFile
 from .storage import get_active_source, get_active_provider, get_provider_by_id
+from .metadata import parse_filename_tags
 
 AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus", ".aac")
 
@@ -51,7 +52,15 @@ async def fetch_folder_recursive(client: httpx.AsyncClient, folder_id: str, api_
                 sub = await fetch_folder_recursive(client, item["id"], api_key)
                 files.extend(sub)
             elif name.lower().endswith(AUDIO_EXTENSIONS):
-                files.append(DriveFile(id=item["id"], name=name))
+                tags = parse_filename_tags(name)
+                files.append(
+                    DriveFile(
+                        id=item["id"],
+                        name=name,
+                        title=tags.get("title") or name,
+                        artist=tags.get("artist") or "",
+                    )
+                )
 
         page_token = data.get("nextPageToken")
         if not page_token:
