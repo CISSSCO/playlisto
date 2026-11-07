@@ -1,0 +1,62 @@
+# Environment & Secrets
+.env
+*.env
+secret.key
+*.key
+*.enc
+backend/data/*.key
+backend/data/*.enc
+
+# Logs & PIDs
+logs/
+*.log
+playlisto.pid
+*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+.playlisto/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node / Frontend
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Editor & OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.vorg.db
+
+# Temporary / duplicate setup scripts
+backend/arch.sh
+frontend/arch.sh

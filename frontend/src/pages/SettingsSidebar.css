@@ -69,6 +69,49 @@
 
 /* PROVIDER LIST */
 
+.section-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 10px;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.provider-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activate-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border: none;
+  transition: 0.2s;
+}
+
+.activate-btn:hover {
+  background: #fff;
+  transform: scale(1.03);
+}
+
 /* SOURCE / PROVIDER ITEM */
 .provider-item {
   display: flex;

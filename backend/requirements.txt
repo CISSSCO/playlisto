@@ -6,4 +6,3 @@ jinja2
 python-dotenv
 cryptography
 mutagen
-asyncio

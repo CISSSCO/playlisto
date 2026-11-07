@@ -1,7 +1,7 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/bin/bash
 
-echo "🚀 Updating Termux..."
-pacman -Syu
+echo "🚀 Updating Arch..."
+# pacman -Syu
 
 echo "📦 Installing required system packages..."
 pacman -Sy python3 rust clang make openssl libffi pkg-config

@@ -1,151 +1,122 @@
-import httpx
-import re
 import asyncio
+import re
+from pathlib import Path
+import httpx
 from fastapi import Request
 from fastapi.responses import StreamingResponse, Response
 
-CHUNK_SIZE = 1024 * 1024  # 1MB for faster startup
+CHUNK_SIZE = 512 * 1024  # 512KB chunks for fast responsiveness
 
 client = httpx.AsyncClient(
     follow_redirects=True,
-    timeout=None,
+    timeout=httpx.Timeout(connect=15.0, read=None, write=30.0, pool=None),
     limits=httpx.Limits(
-        max_keepalive_connections=20,
-        max_connections=50,
+        max_keepalive_connections=30,
+        max_connections=100,
     ),
 )
 
-# cache for metadata
-metadata_cache = {}
-
-# cache for prefetched chunks
-prefetch_cache = {}
-
-
-async def fetch_metadata(file_id, params, headers):
-    if file_id in metadata_cache:
-        return metadata_cache[file_id]
-
-    r = await client.get(
-        "https://drive.google.com/uc",
-        params=params,
-        headers=headers,
-    )
-
-    metadata_cache[file_id] = r.headers
-    return r.headers
+MIME_TYPES = {
+    ".flac": "audio/flac",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
+    ".aac": "audio/aac",
+}
 
 
-async def prefetch_first_chunk(file_id):
-    if file_id in prefetch_cache:
-        return
+def guess_content_type(filename: str, upstream_content_type: str = "") -> str:
+    if filename:
+        ext = Path(filename).suffix.lower()
+        if ext in MIME_TYPES:
+            return MIME_TYPES[ext]
+    if upstream_content_type and "text" not in upstream_content_type:
+        return upstream_content_type
+    return "audio/flac"
 
-    try:
-        r = await client.get(
-            "https://drive.google.com/uc",
-            params={
-                "export": "download",
-                "id": file_id,
-            },
-            headers={
-                "Range": f"bytes=0-{CHUNK_SIZE-1}"
-            },
-        )
 
-        prefetch_cache[file_id] = r.content
+async def open_drive_stream(file_id: str, headers: dict) -> httpx.Response:
+    base_url = "https://drive.google.com/uc"
+    params = {"export": "download", "id": file_id}
 
-    except Exception:
-        pass
+    req = client.build_request("GET", base_url, params=params, headers=headers)
+    resp = await client.send(req, stream=True)
+
+    # Check for Google Drive virus scan warning / confirm screen on large files
+    content_type = resp.headers.get("content-type", "").lower()
+    if "text/html" in content_type:
+        body = await resp.aread()
+        await resp.aclose()
+        text = body.decode("utf-8", errors="ignore")
+
+        confirm_token = None
+        match = re.search(r"confirm=([0-9A-Za-z_-]+)", text)
+        if match:
+            confirm_token = match.group(1)
+        else:
+            match_input = re.search(r'name="confirm"\s+value="([^"]+)"', text)
+            if match_input:
+                confirm_token = match_input.group(1)
+
+        if confirm_token:
+            params["confirm"] = confirm_token
+            req2 = client.build_request("GET", base_url, params=params, headers=headers)
+            resp = await client.send(req2, stream=True)
+
+    return resp
 
 
 async def stream_file(file_id: str, filename: str, request: Request):
-
-    base_url = "https://drive.google.com/uc"
-
-    params = {
-        "export": "download",
-        "id": file_id,
-    }
-
     headers = {}
     range_header = request.headers.get("range")
-
     if range_header:
         headers["Range"] = range_header
 
-    # Kodi HEAD probe
+    # Fast HEAD request support for media players probing file info
     if request.method == "HEAD":
-
-        meta = await fetch_metadata(file_id, params, headers)
-
-        return Response(
-            status_code=200,
-            headers={
-                "Accept-Ranges": "bytes",
-                "Content-Type": meta.get("content-type", "audio/flac"),
-            },
-        )
-
-    meta = await fetch_metadata(file_id, params, headers)
-
-    response_headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": meta.get("content-type", "audio/flac"),
-    }
-
-    if "content-range" in meta:
-        response_headers["Content-Range"] = meta["content-range"]
-
-    async def proxy_stream():
-
+        resp = await open_drive_stream(file_id, headers)
         try:
+            status = resp.status_code
+            content_type = guess_content_type(filename, resp.headers.get("content-type", ""))
+            resp_headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Type": content_type,
+            }
+            if "content-length" in resp.headers:
+                resp_headers["Content-Length"] = resp.headers["content-length"]
+            if "content-range" in resp.headers:
+                resp_headers["Content-Range"] = resp.headers["content-range"]
+            return Response(status_code=status, headers=resp_headers)
+        finally:
+            await resp.aclose()
 
-            # serve prefetched chunk if available
-            if file_id in prefetch_cache:
-                yield prefetch_cache.pop(file_id)
+    resp = await open_drive_stream(file_id, headers)
+    status_code = resp.status_code
+    content_type = guess_content_type(filename, resp.headers.get("content-type", ""))
 
-            async with client.stream(
-                "GET",
-                base_url,
-                params=params,
-                headers=headers,
-            ) as response:
+    resp_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type,
+    }
+    if "content-length" in resp.headers:
+        resp_headers["Content-Length"] = resp.headers["content-length"]
+    if "content-range" in resp.headers:
+        resp_headers["Content-Range"] = resp.headers["content-range"]
 
-                # Google Drive confirm page handling
-                if "text/html" in response.headers.get("content-type", ""):
-
-                    body = await response.aread()
-                    text = body.decode()
-
-                    match = re.search(r"confirm=([0-9A-Za-z_]+)", text)
-
-                    if match:
-
-                        params["confirm"] = match.group(1)
-
-                        async with client.stream(
-                            "GET",
-                            base_url,
-                            params=params,
-                            headers=headers,
-                        ) as response2:
-
-                            async for chunk in response2.aiter_bytes(CHUNK_SIZE):
-                                yield chunk
-
-                        return
-
-                async for chunk in response.aiter_bytes(CHUNK_SIZE):
-                    yield chunk
-
-        except (asyncio.CancelledError, httpx.ReadError):
-            return
-
-    # start background prefetch
-    asyncio.create_task(prefetch_first_chunk(file_id))
+    async def body_stream():
+        try:
+            async for chunk in resp.aiter_bytes(CHUNK_SIZE):
+                yield chunk
+        except (asyncio.CancelledError, httpx.ReadError, httpx.RemoteProtocolError):
+            pass
+        finally:
+            await resp.aclose()
 
     return StreamingResponse(
-        proxy_stream(),
-        status_code=206 if range_header else 200,
-        headers=response_headers,
+        body_stream(),
+        status_code=status_code,
+        headers=resp_headers,
     )
