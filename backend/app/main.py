@@ -1,12 +1,13 @@
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 import httpx
 
 from .drive import fetch_folder_files
 from .streaming import stream_file
+from .metadata import get_artwork, get_or_extract_metadata
 from .storage import (
     add_source,
     load_sources,
@@ -17,6 +18,8 @@ from .storage import (
     get_active_source,
     get_providers_metadata,
     set_active_provider,
+    get_cached_playlist,
+    set_cached_playlist,
 )
 
 app = FastAPI(title="Playlisto")
@@ -34,10 +37,20 @@ app.add_middleware(
 # =========================
 
 @app.post("/api/load-folder")
-async def load_folder():
+async def load_folder(refresh: bool = False):
     active_source = get_active_source()
     if not active_source:
         raise HTTPException(status_code=400, detail="No active source configured")
+
+    source_id = active_source.get("id")
+    if not refresh and source_id:
+        cached = get_cached_playlist(source_id)
+        if cached and cached.get("files"):
+            return {
+                "name": cached.get("name", active_source.get("name")),
+                "files": cached.get("files"),
+                "cached": True,
+            }
 
     try:
         files = await fetch_folder_files()
@@ -52,9 +65,14 @@ async def load_folder():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch files from source: {str(e)}")
 
+    file_dicts = [f.model_dump() if hasattr(f, "model_dump") else f.dict() for f in files]
+    if source_id:
+        set_cached_playlist(source_id, active_source.get("name", "Active Source"), file_dicts)
+
     return {
         "name": active_source.get("name", "Active Source"),
-        "files": [f.model_dump() if hasattr(f, "model_dump") else f.dict() for f in files],
+        "files": file_dicts,
+        "cached": False,
     }
 
 
@@ -64,6 +82,24 @@ async def stream(file_id: str, request: Request, filename: str = "audio.flac"):
         return await stream_file(file_id, filename, request)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Streaming error: {str(e)}")
+
+
+@app.get("/api/artwork/{file_id}")
+async def get_track_artwork(file_id: str, filename: str = ""):
+    art = await get_artwork(file_id, filename)
+    if not art:
+        raise HTTPException(status_code=404, detail="No artwork found")
+    image_bytes, mime = art
+    return Response(
+        content=image_bytes,
+        media_type=mime,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/metadata/{file_id}")
+async def get_track_metadata(file_id: str, filename: str = ""):
+    return await get_or_extract_metadata(file_id, filename)
 
 
 # =========================
