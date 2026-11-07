@@ -1,7 +1,7 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/bin/bash
 
-echo "🚀 Updating Termux..."
-apt update -y && apt upgrade -y
+echo "🚀 Updating Ubuntu..."
+sudo apt update -y && sudo apt upgrade -y
 
 echo "📦 Installing required system packages..."
 apt install -y python3 rust clang make openssl libffi pkg-config

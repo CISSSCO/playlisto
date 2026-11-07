@@ -7,10 +7,11 @@ import uuid
 # PATHS
 # =====================================================
 
-DATA_PATH = Path("data/folders.json")
-PROVIDERS_PATH = Path("data/providers.enc")
-SOURCES_PATH = Path("data/sources.enc")
-KEY_PATH = Path("data/secret.key")
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_PATH = DATA_DIR / "folders.json"
+PROVIDERS_PATH = DATA_DIR / "providers.enc"
+SOURCES_PATH = DATA_DIR / "sources.enc"
+KEY_PATH = DATA_DIR / "secret.key"
 
 # =====================================================
 # ENCRYPTION
@@ -110,6 +111,22 @@ def get_active_provider():
 
     return None
 
+
+def get_provider_by_id(provider_id):
+    data = load_providers()
+    for p in data["providers"]:
+        if p["id"] == provider_id:
+            return p
+    return None
+
+
+def delete_provider(provider_id):
+    data = load_providers()
+    data["providers"] = [p for p in data["providers"] if p["id"] != provider_id]
+    if data.get("active_provider_id") == provider_id:
+        data["active_provider_id"] = data["providers"][0]["id"] if data["providers"] else None
+    save_providers(data)
+
 # =====================================================
 # SOURCES (Encrypted URLs)
 # =====================================================
@@ -154,6 +171,14 @@ def add_source(name, url, provider_id):
 def activate_source(source_id):
     data = load_sources()
     data["active_source_id"] = source_id
+    save_sources(data)
+
+
+def delete_source(source_id):
+    data = load_sources()
+    data["sources"] = [s for s in data["sources"] if s["id"] != source_id]
+    if data.get("active_source_id") == source_id:
+        data["active_source_id"] = data["sources"][0]["id"] if data["sources"] else None
     save_sources(data)
 
 

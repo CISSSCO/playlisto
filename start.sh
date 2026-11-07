@@ -20,9 +20,11 @@ cd "$BACKEND_DIR" || exit 1
 
 if [ -d ".playlisto" ]; then
   source .playlisto/bin/activate
+elif [ -d ".venv" ]; then
+  source .venv/bin/activate
 fi
 
-setsid uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 \
   > "$LOG_DIR/backend.log" 2>&1 &
 
 BACKEND_PID=$!
@@ -35,7 +37,7 @@ echo "🔹 Starting Frontend..."
 
 cd "$FRONTEND_DIR" || exit 1
 
-setsid npm run dev \
+nohup npm run dev \
   > "$LOG_DIR/frontend.log" 2>&1 &
 
 FRONTEND_PID=$!
