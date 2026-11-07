@@ -55,6 +55,7 @@ yarn-error.log*
 .vscode/
 *.swp
 *.swo
+.vorg.db
 
 # Temporary / duplicate setup scripts
 backend/arch.sh
